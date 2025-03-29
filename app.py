@@ -1,7 +1,7 @@
 import streamlit as st
 import re
 
-# === Sentiment Analyzer ===
+# === Analyze sentiment ===
 def analyze_sentiment(email_text):
     email_text = email_text.lower()
 
@@ -40,7 +40,7 @@ def analyze_sentiment(email_text):
         "neutral_matches": neutral_score
     }
 
-# === Real Estate Pro Reply Generator ===
+# === Reply Generator ===
 def generate_reply(sentiment_result, sender_name, your_name, topic, tone="Professional"):
     sentiment = sentiment_result["sentiment"]
 
@@ -82,7 +82,7 @@ I’m on it like a broker on a commission check 😎
 Talk soon,  
 {your_name}"""
 
-    else:  # Professional (default)
+    else:  # Professional
         return f"""Dear {sender_name},
 
 Thank you for your message regarding {topic}. I’ll review it and respond with any necessary details or next steps shortly.
@@ -91,35 +91,51 @@ Best regards,
 {your_name}"""
 
 # === Streamlit UI ===
-st.set_page_config(page_title="📬 Real Estate Reply Assistant", layout="centered")
+st.set_page_config(
+    page_title="📬 Real Estate Reply Assistant",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-st.title("📬 Real Estate Reply Assistant")
-st.write("Drop in an email from your team or client. Get a reply in your chosen tone — fast and clean.")
+st.markdown("<h1 style='text-align: center;'>📬 Real Estate Reply Assistant</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Paste in an email → choose your tone → get a reply in seconds.</p>", unsafe_allow_html=True)
+st.divider()
 
-email_text = st.text_area("✉️ Paste the email you received:", height=200)
+col1, col2 = st.columns(2)
 
-your_name = st.text_input("Your Name", value="Ryan")
-sender_name = st.text_input("Sender's Name", value="Jordan")
-topic = st.text_input("What’s this about?", value="Lease Proposal")
+with col1:
+    st.subheader("📥 Email Received")
+    email_text = st.text_area("Paste the email here:", height=280, label_visibility="collapsed")
 
-tone = st.selectbox("Tone of your reply", ["Professional", "Friendly", "Assertive", "Empathetic", "Playful"])
+    your_name = st.text_input("Your Name", value="Ryan")
+    sender_name = st.text_input("Sender's Name", value="Jordan")
+    topic = st.text_input("Topic / Subject", value="Lease Proposal")
+    tone = st.selectbox("Tone of the Reply", ["Professional", "Friendly", "Assertive", "Empathetic", "Playful"])
 
-if st.button("Analyze & Generate Reply"):
-    if not email_text.strip():
-        st.warning("Paste an email to analyze first.")
-    else:
-        result = analyze_sentiment(email_text)
-        reply = generate_reply(result, sender_name, your_name, topic, tone)
+    if st.button("🚀 Analyze & Generate"):
+        if not email_text.strip():
+            st.warning("Paste an email first.")
+        else:
+            result = analyze_sentiment(email_text)
+            reply = generate_reply(result, sender_name, your_name, topic, tone)
 
+            st.session_state["analysis"] = result
+            st.session_state["reply"] = reply
+
+with col2:
+    if "analysis" in st.session_state and "reply" in st.session_state:
         st.subheader("🔍 Sentiment Vibe")
-        st.json(result)
+        st.json(st.session_state["analysis"])
 
-        st.subheader("💬 Suggested Reply")
-        st.code(reply)
+        st.subheader("✉️ Suggested Reply")
+        st.code(st.session_state["reply"], language="markdown")
 
         st.download_button(
-            label="📋 Copy Reply (as .txt)",
-            data=reply,
+            label="📋 Copy Reply (Download as .txt)",
+            data=st.session_state["reply"],
             file_name="reply.txt",
             mime="text/plain"
         )
+    else:
+        st.markdown("Waiting for input on the left 👈")
+
