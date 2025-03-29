@@ -44,8 +44,6 @@ def analyze_sentiment(email_text):
 
 # === Template-Based Reply (Classic) ===
 def generate_template_reply(sentiment_result, sender_name, your_name, topic, tone="Professional"):
-    sentiment = sentiment_result["sentiment"]
-
     if tone == "Friendly":
         return f"""Hey {sender_name},
 
@@ -92,7 +90,7 @@ Thank you for your message regarding {topic}. I’ll review it and respond with 
 Best regards,  
 {your_name}"""
 
-# === AI-Powered Reply using OpenAI SDK v1 ===
+# === AI-Powered Reply using GPT-3.5 ===
 def generate_ai_reply(email_text, tone, your_name, sender_name, topic):
     system_prompt = f"""
 You are a commercial real estate broker writing professional email replies.
@@ -112,7 +110,7 @@ Keep the message concise but thoughtful. DO NOT just copy the original text. Spe
     ]
 
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=messages,
         temperature=0.7
     )
