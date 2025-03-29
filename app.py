@@ -1,36 +1,33 @@
 import streamlit as st
+import openai
 import re
 
-# === Analyze sentiment ===
+# === Config ===
+st.set_page_config(page_title="📬 Real Estate Reply Assistant", layout="wide")
+
+# === Setup OpenAI ===
+openai.api_key = st.secrets["openai"]["api_key"]
+
+# === Sentiment Analyzer (same as before) ===
 def analyze_sentiment(email_text):
     email_text = email_text.lower()
-
-    positive_keywords = [
-        "good", "great", "excellent", "happy", "thank you", "thanks", "appreciate", 
-        "helpful", "awesome", "fantastic", "amazing", "best", "glad", "eager", "excited", 
-        "pleased", "positive"
-    ]
-    negative_keywords = [
-        "bad", "terrible", "awful", "unhappy", "disappointed", "frustrated", "angry", 
-        "problem", "issue", "concern", "delay", "late", "wrong", "difficult", "not good", "never"
-    ]
-    neutral_keywords = [
-        "information", "question", "request", "regarding", "following up", "update", 
-        "meeting", "schedule", "consider", "let me know", "understand"
-    ]
+    positive_keywords = ["good", "great", "excellent", "happy", "thank you", "thanks", "appreciate", 
+        "helpful", "awesome", "fantastic", "amazing", "best", "glad", "eager", "excited", "pleased", "positive"]
+    negative_keywords = ["bad", "terrible", "awful", "unhappy", "disappointed", "frustrated", "angry", 
+        "problem", "issue", "concern", "delay", "late", "wrong", "difficult", "not good", "never"]
+    neutral_keywords = ["information", "question", "request", "regarding", "following up", "update", 
+        "meeting", "schedule", "consider", "let me know", "understand"]
 
     positive_score = sum(1 for word in positive_keywords if re.search(r'\b' + re.escape(word) + r'\b', email_text))
     negative_score = sum(1 for word in negative_keywords if re.search(r'\b' + re.escape(word) + r'\b', email_text))
-    neutral_score  = sum(1 for word in neutral_keywords  if re.search(r'\b' + re.escape(word) + r'\b', email_text))
+    neutral_score = sum(1 for word in neutral_keywords if re.search(r'\b' + re.escape(word) + r'\b', email_text))
 
     total_score = positive_score - negative_score
-
+    sentiment = "Neutral"
     if total_score > 0:
         sentiment = "Positive"
     elif total_score < 0:
         sentiment = "Negative"
-    else:
-        sentiment = "Neutral"
 
     return {
         "score": total_score,
@@ -40,8 +37,8 @@ def analyze_sentiment(email_text):
         "neutral_matches": neutral_score
     }
 
-# === Reply Generator ===
-def generate_reply(sentiment_result, sender_name, your_name, topic, tone="Professional"):
+# === Classic Template-Based Reply ===
+def generate_template_reply(sentiment_result, sender_name, your_name, topic, tone="Professional"):
     sentiment = sentiment_result["sentiment"]
 
     if tone == "Friendly":
@@ -90,15 +87,37 @@ Thank you for your message regarding {topic}. I’ll review it and respond with 
 Best regards,  
 {your_name}"""
 
-# === Streamlit UI ===
-st.set_page_config(
-    page_title="📬 Real Estate Reply Assistant",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# === AI-Powered Reply (GPT-4) ===
+def generate_ai_reply(email_text, tone, your_name, sender_name, topic):
+    system_prompt = f"""
+You are a commercial real estate broker writing professional email replies.
 
+Write a clear, helpful response to the email below, based on this context:
+- Sender: {sender_name}
+- Topic: {topic}
+- Your name: {your_name}
+- Desired tone: {tone.lower()}
+
+Keep the message concise but thoughtful. DO NOT just copy the original text. Speak directly to the sender and sound human.
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": email_text}
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4",  # You can use "gpt-3.5-turbo" if needed
+        messages=messages,
+        temperature=0.7
+    )
+
+    reply = response.choices[0].message.content.strip()
+    return reply
+
+# === Streamlit UI ===
 st.markdown("<h1 style='text-align: center;'>📬 Real Estate Reply Assistant</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Paste in an email → choose your tone → get a reply in seconds.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Paste an email → Choose tone + mode → Get a smart reply.</p>", unsafe_allow_html=True)
 st.divider()
 
 col1, col2 = st.columns(2)
@@ -110,16 +129,21 @@ with col1:
     your_name = st.text_input("Your Name", value="Ryan")
     sender_name = st.text_input("Sender's Name", value="Jordan")
     topic = st.text_input("Topic / Subject", value="Lease Proposal")
-    tone = st.selectbox("Tone of the Reply", ["Professional", "Friendly", "Assertive", "Empathetic", "Playful"])
 
-    if st.button("🚀 Analyze & Generate"):
+    tone = st.selectbox("Tone of the Reply", ["Professional", "Friendly", "Assertive", "Empathetic", "Playful"])
+    mode = st.radio("Reply Mode", ["🤖 AI-Powered", "📄 Template-Based"])
+
+    if st.button("🚀 Generate Reply"):
         if not email_text.strip():
             st.warning("Paste an email first.")
         else:
-            result = analyze_sentiment(email_text)
-            reply = generate_reply(result, sender_name, your_name, topic, tone)
+            sentiment_result = analyze_sentiment(email_text)
+            if mode == "🤖 AI-Powered":
+                reply = generate_ai_reply(email_text, tone, your_name, sender_name, topic)
+            else:
+                reply = generate_template_reply(sentiment_result, sender_name, your_name, topic, tone)
 
-            st.session_state["analysis"] = result
+            st.session_state["analysis"] = sentiment_result
             st.session_state["reply"] = reply
 
 with col2:
@@ -127,7 +151,7 @@ with col2:
         st.subheader("🔍 Sentiment Vibe")
         st.json(st.session_state["analysis"])
 
-        st.subheader("✉️ Suggested Reply")
+        st.subheader("✉️ Smart Reply")
         st.code(st.session_state["reply"], language="markdown")
 
         st.download_button(
@@ -138,4 +162,3 @@ with col2:
         )
     else:
         st.markdown("Waiting for input on the left 👈")
-
