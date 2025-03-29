@@ -1,22 +1,27 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import re
 
-# === Config ===
-st.set_page_config(page_title="📬 Real Estate Reply Assistant", layout="wide")
+# === Connect to OpenAI ===
+client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-# === Setup OpenAI ===
-openai.api_key = st.secrets["openai"]["api_key"]
-
-# === Sentiment Analyzer (same as before) ===
+# === Analyze sentiment from text ===
 def analyze_sentiment(email_text):
     email_text = email_text.lower()
-    positive_keywords = ["good", "great", "excellent", "happy", "thank you", "thanks", "appreciate", 
-        "helpful", "awesome", "fantastic", "amazing", "best", "glad", "eager", "excited", "pleased", "positive"]
-    negative_keywords = ["bad", "terrible", "awful", "unhappy", "disappointed", "frustrated", "angry", 
-        "problem", "issue", "concern", "delay", "late", "wrong", "difficult", "not good", "never"]
-    neutral_keywords = ["information", "question", "request", "regarding", "following up", "update", 
-        "meeting", "schedule", "consider", "let me know", "understand"]
+
+    positive_keywords = [
+        "good", "great", "excellent", "happy", "thank you", "thanks", "appreciate",
+        "helpful", "awesome", "fantastic", "amazing", "best", "glad", "eager", "excited",
+        "pleased", "positive"
+    ]
+    negative_keywords = [
+        "bad", "terrible", "awful", "unhappy", "disappointed", "frustrated", "angry",
+        "problem", "issue", "concern", "delay", "late", "wrong", "difficult", "not good", "never"
+    ]
+    neutral_keywords = [
+        "information", "question", "request", "regarding", "following up", "update",
+        "meeting", "schedule", "consider", "let me know", "understand"
+    ]
 
     positive_score = sum(1 for word in positive_keywords if re.search(r'\b' + re.escape(word) + r'\b', email_text))
     negative_score = sum(1 for word in negative_keywords if re.search(r'\b' + re.escape(word) + r'\b', email_text))
@@ -37,7 +42,7 @@ def analyze_sentiment(email_text):
         "neutral_matches": neutral_score
     }
 
-# === Classic Template-Based Reply ===
+# === Template-Based Reply (Classic) ===
 def generate_template_reply(sentiment_result, sender_name, your_name, topic, tone="Professional"):
     sentiment = sentiment_result["sentiment"]
 
@@ -87,7 +92,7 @@ Thank you for your message regarding {topic}. I’ll review it and respond with 
 Best regards,  
 {your_name}"""
 
-# === AI-Powered Reply (GPT-4) ===
+# === AI-Powered Reply using OpenAI SDK v1 ===
 def generate_ai_reply(email_text, tone, your_name, sender_name, topic):
     system_prompt = f"""
 You are a commercial real estate broker writing professional email replies.
@@ -106,16 +111,16 @@ Keep the message concise but thoughtful. DO NOT just copy the original text. Spe
         {"role": "user", "content": email_text}
     ]
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # You can use "gpt-3.5-turbo" if needed
+    response = client.chat.completions.create(
+        model="gpt-4",
         messages=messages,
         temperature=0.7
     )
 
-    reply = response.choices[0].message.content.strip()
-    return reply
+    return response.choices[0].message.content.strip()
 
 # === Streamlit UI ===
+st.set_page_config(page_title="📬 Real Estate Reply Assistant", layout="wide")
 st.markdown("<h1 style='text-align: center;'>📬 Real Estate Reply Assistant</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Paste an email → Choose tone + mode → Get a smart reply.</p>", unsafe_allow_html=True)
 st.divider()
